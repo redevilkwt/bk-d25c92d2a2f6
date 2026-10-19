@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>لوحة عملاء Black</title>
+<style>
+:root{--bg:#ece9e1;--card:#f6f4ee;--ink:#1b1d1c;--mut:#6d716e;--line:#dcd8cc;--green:#2f5445;--rust:#b5471f;--gold:#e4b93d;--r:22px}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Tahoma,"Geeza Pro",system-ui,sans-serif;background:linear-gradient(160deg,#f1e3d3,#e6e8df 55%);color:var(--ink);min-height:100vh}
+header{display:flex;align-items:center;gap:18px;padding:18px 28px;flex-wrap:wrap}
+.logo{background:var(--ink);color:#fff;border-radius:12px;padding:6px 14px;font-weight:800}
+nav{display:flex;gap:6px;background:var(--card);border-radius:99px;padding:5px}
+nav button{border:0;background:none;padding:9px 20px;border-radius:99px;font:inherit;cursor:pointer;color:var(--ink)}
+nav button.on{background:var(--ink);color:#fff}
+.sp{flex:1}
+.btn{border:1px solid var(--line);background:var(--card);padding:9px 16px;border-radius:99px;font:inherit;cursor:pointer}
+.btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+main{padding:0 28px 40px;max-width:1280px;margin:auto}
+h1{margin:6px 0 16px;font-size:30px}
+.stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.stat{background:var(--card);border-radius:var(--r);padding:14px 20px;min-width:170px;box-shadow:0 2px 10px #0000000d}
+.stat b{display:block;font-size:26px}.stat span{color:var(--mut);font-size:13px}
+.bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:99px;padding:9px 16px;background:var(--card);min-width:200px}
+textarea{border-radius:16px;width:100%}
+.chip{border:1px solid var(--line);background:var(--card);padding:7px 14px;border-radius:99px;cursor:pointer;font-size:14px}
+.chip.on{background:var(--ink);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.card{background:var(--card);border-radius:var(--r);padding:18px;box-shadow:0 2px 10px #0000000d;cursor:pointer}
+.card h3{margin:0 0 2px}.card small{color:var(--mut)}
+.meta{display:flex;justify-content:space-between;background:#e9e6dc;border-radius:14px;padding:10px 12px;margin:12px 0;font-size:13px}
+.meta b{display:block;font-size:15px}
+.prog{height:6px;background:#dedacd;border-radius:9px;overflow:hidden}.prog i{display:block;height:100%}
+.tag{display:inline-block;padding:3px 11px;border-radius:99px;font-size:12px;background:#e4e1d6}
+.ok{background:#d6e5db;color:var(--green)}.warn{background:#f6e6b4;color:#7a5b00}.bad{background:#f2d5c8;color:var(--rust)}.off{background:#ddd;color:#555}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:var(--r);overflow:hidden}
+th,td{padding:13px 16px;text-align:right;border-bottom:1px solid var(--line);font-size:14px}th{color:var(--mut);font-weight:600}
+tr.row{cursor:pointer}tr.row:hover{background:#efece3}
+.panel{background:var(--card);border-radius:var(--r);padding:22px;margin-bottom:16px}
+.bars div.r{display:flex;align-items:center;gap:12px;margin:10px 0}
+.bars .lab{width:90px}.bars .tr{flex:1;background:#e2dfd3;border-radius:9px;height:22px;overflow:hidden}.bars .tr i{display:block;height:100%;background:var(--green)}
+dialog{border:0;border-radius:var(--r);padding:24px;width:min(460px,92vw);background:var(--card);direction:rtl}
+dialog::backdrop{background:#0006}
+label{display:block;margin:12px 0 4px;font-size:13px;color:var(--mut)}
+dialog input,dialog select{width:100%;border-radius:12px}
+.note{color:var(--mut);font-size:13px;margin-top:20px}
+@media(max-width:700px){header,main{padding-inline:14px}table{font-size:12px}th,td{padding:9px 8px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Black</div>
+  <nav id="nav">
+    <button data-p="customers" class="on">العملاء</button>
+    <button data-p="subs">الاشتراكات</button>
+    <button data-p="sources">المصادر</button>
+  </nav>
+  <div class="sp"></div>
+  <button class="btn" id="imp">استيراد customer-licenses.json</button>
+  <button class="btn" id="demo">بيانات تجريبية</button>
+  <button class="btn dark" id="exp">تصدير CSV</button>
+  <input type="file" id="file" accept=".json" hidden>
+</header>
+<main id="app"></main>
+<dialog id="dlg"></dialog>
+
+<script>
+const SRC=["واتساب","ديسكورد","موقع","توصية","أخرى"];
+const PAY={paid:"مدفوع",due:"مستحق",late:"متأخر"};
+const DAY=864e5;
+let page="customers",filter="all",q="";
+let licenses=JSON.parse(localStorage.getItem("bk_lic")||"[]");   // from the manager file; keys are never stored in full
+let extra=JSON.parse(localStorage.getItem("bk_extra")||"{}");     // discord, source, pay, amount, notes
+const save=()=>{localStorage.setItem("bk_lic",JSON.stringify(licenses));localStorage.setItem("bk_extra",JSON.stringify(extra))};
+
+const parseExp=s=>{const m=String(s||"").match(/^(\d{4})-(\d\d)-(\d\d)-(\d\d)-(\d\d)-(\d\d)$/);return m?Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6]):Date.parse(s)};
+const fp=k=>String(k||"").slice(-8);
+function view(l){
+  const e=extra[l.id]||{};const exp=parseExp(l.expiresUTC);const days=Math.ceil((exp-Date.now())/DAY);
+  let st="ok",lab="نشط";
+  if(!l.enabled){st="off";lab="معطّل"}else if(days<0){st="bad";lab="منتهي"}else if(days<=14){st="warn";lab="قارب ينتهي"}
+  return{...l,e,days,st,lab,exp,pay:e.pay||"paid",src:e.src||"أخرى"};
+}
+const all=()=>licenses.map(view);
+const fmt=t=>isNaN(t)?"—":new Date(t).toLocaleDateString("ar-KW",{year:"numeric",month:"short",day:"numeric"});
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function stats(a){
+  const act=a.filter(x=>x.st==="ok"||x.st==="warn").length;
+  return `<div class="stats">
+   <div class="stat"><b>${a.length}</b><span>إجمالي العملاء</span></div>
+   <div class="stat"><b>${act}</b><span>اشتراكات فعّالة</span></div>
+   <div class="stat"><b>${a.filter(x=>x.st==="warn").length}</b><span>تنتهي خلال 14 يوم</span></div>
+   <div class="stat"><b>${a.filter(x=>x.pay==="late").length}</b><span>دفعات متأخرة</span></div></div>`;
+}
+function match(x){
+  if(q&&!(x.name+" "+(x.e.discord||"")).toLowerCase().includes(q.toLowerCase()))return false;
+  return filter==="all"||x.st===filter||x.pay===filter;
+}
+function chips(){
+  const f=[["all","الكل"],["ok","نشط"],["warn","قارب ينتهي"],["bad","منتهي"],["late","متأخر الدفع"]];
+  return f.map(([k,t])=>`<span class="chip ${filter===k?"on":""}" data-f="${k}">${t}</span>`).join("");
+}
+function render(){
+  const a=all();let h="";
+  if(!a.length){
+    document.getElementById("app").innerHTML=`<h1>لوحة العملاء</h1><div class="panel">ما فيه بيانات. اضغط "استيراد" وارفع ملف <b>customer-licenses.json</b> من مدير Black (المجلد private)، أو جرّب "بيانات تجريبية".<div class="note">الملف يُقرأ داخل المتصفح فقط ولا يُرسل لأي مكان، والمفتاح يُعرض كبصمة من 8 خانات.</div></div>`;return}
+  const tools=`<div class="bar"><input id="q" placeholder="ابحث بالاسم أو الديسكورد…" value="${esc(q)}">${chips()}</div>`;
+  if(page==="customers"){
+    h=`<h1>دليل العملاء</h1>${stats(a)}${tools}<div class="grid">`+a.filter(match).map(x=>{
+      const pct=Math.max(0,Math.min(100,x.days/365*100));const col={ok:"var(--green)",warn:"var(--gold)",bad:"var(--rust)",off:"#999"}[x.st];
+      return `<div class="card" data-id="${x.id}"><h3>${esc(x.name)}</h3><small>${esc(x.e.discord||"بدون ديسكورد")} · ${esc(x.src)}</small>
+      <div class="meta"><span>ينتهي<b>${fmt(x.exp)}</b></span><span>المتبقي<b>${x.days<0?"منتهي":x.days+" يوم"}</b></span></div>
+      <div class="prog"><i style="width:${pct}%;background:${col}"></i></div>
+      <p style="margin:12px 0 0"><span class="tag ${x.st}">${x.lab}</span> <span class="tag ${x.pay==="paid"?"ok":x.pay==="late"?"bad":"warn"}">${PAY[x.pay]}</span> <small style="float:left;color:var(--mut)">#${fp(x.key)}</small></p></div>`}).join("")+`</div>`;
+  }else if(page==="subs"){
+    const rev=a.reduce((s,x)=>s+(x.pay==="paid"?+x.e.amount||0:0),0),due=a.reduce((s,x)=>s+(x.pay!=="paid"?+x.e.amount||0:0),0);
+    h=`<h1>الاشتراكات والدفعات</h1><div class="stats"><div class="stat"><b>${rev} د.ك</b><span>مدفوع</span></div><div class="stat"><b>${due} د.ك</b><span>مستحق / متأخر</span></div></div>${tools}
+    <table><tr><th>العميل</th><th>الانتهاء</th><th>المتبقي</th><th>الحالة</th><th>الدفع</th><th>المبلغ</th></tr>`+
+    a.filter(match).sort((x,y)=>x.exp-y.exp).map(x=>`<tr class="row" data-id="${x.id}"><td><b>${esc(x.name)}</b></td><td>${fmt(x.exp)}</td><td>${x.days<0?"منتهي":x.days+" يوم"}</td><td><span class="tag ${x.st}">${x.lab}</span></td><td><span class="tag ${x.pay==="paid"?"ok":x.pay==="late"?"bad":"warn"}">${PAY[x.pay]}</span></td><td>${x.e.amount?x.e.amount+" د.ك":"—"}</td></tr>`).join("")+`</table>`;
+  }else{
+    const c={};a.forEach(x=>c[x.src]=(c[x.src]||0)+1);const mx=Math.max(...Object.values(c));
+    h=`<h1>مصادر العملاء</h1><div class="panel bars"><b>من وين جاك العملاء؟</b>`+
+    Object.entries(c).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`<div class="r"><span class="lab">${k}</span><div class="tr"><i style="width:${v/mx*100}%"></i></div><b>${v}</b></div>`).join("")+`</div>`;
+  }
+  document.getElementById("app").innerHTML=h+`<div class="note">الأرقام من ملف التراخيص. المصدر والدفع والمبلغ تُحفظ محلياً في هذا المتصفح فقط.</div>`;
+  const qi=document.getElementById("q");if(qi)qi.oninput=e=>{q=e.target.value;render();document.getElementById("q").focus()};
+}
+document.getElementById("app").onclick=e=>{
+  const c=e.target.closest(".chip");if(c){filter=c.dataset.f;render();return}
+  const r=e.target.closest("[data-id]");if(r)edit(r.dataset.id);
+};
+document.getElementById("nav").onclick=e=>{const b=e.target.closest("button");if(!b)return;page=b.dataset.p;filter="all";
+  [...nav.children].forEach(x=>x.classList.toggle("on",x===b));render()};
+function edit(id){
+  const x=all().find(v=>v.id===id),d=document.getElementById("dlg");
+  d.innerHTML=`<h3 style="margin-top:0">${esc(x.name)} <small style="color:var(--mut)">#${fp(x.key)}</small></h3>
+  <label>حساب الديسكورد</label><input id="f_d" value="${esc(x.e.discord||"")}">
+  <label>المصدر</label><select id="f_s">${SRC.map(s=>`<option ${s===x.src?"selected":""}>${s}</option>`).join("")}</select>
+  <label>حالة الدفع</label><select id="f_p">${Object.entries(PAY).map(([k,v])=>`<option value="${k}" ${k===x.pay?"selected":""}>${v}</option>`).join("")}</select>
+  <label>المبلغ (د.ك)</label><input id="f_a" type="number" value="${esc(x.e.amount||"")}">
+  <label>ملاحظات</label><textarea id="f_n" rows="3">${esc(x.e.notes||"")}</textarea>
+  <p style="display:flex;gap:8px;margin-bottom:0"><button class="btn dark" id="ok">حفظ</button><button class="btn" id="no">إلغاء</button></p>`;
+  d.showModal();
+  d.querySelector("#no").onclick=()=>d.close();
+  d.querySelector("#ok").onclick=()=>{extra[id]={discord:f_d.value.trim(),src:f_s.value,pay:f_p.value,amount:f_a.value,notes:f_n.value};save();d.close();render()};
+}
+// Import: keep name/expiry/enabled and only the last 8 key characters; full keys never leave the file
+document.getElementById("imp").onclick=()=>file.click();
+file.onchange=async e=>{
+  try{const j=JSON.parse(await e.target.files[0].text());
+    licenses=(j.customers||[]).map(c=>({id:fp(c.key),name:c.name,key:fp(c.key),expiresUTC:c.expiresUTC,enabled:c.enabled!==false}));
+    save();render()}catch(err){alert("الملف غير صالح: "+err.message)}
+  file.value="";
+};
+document.getElementById("demo").onclick=()=>{
+  const n=(d)=>{const t=new Date(Date.now()+d*DAY);const p=v=>String(v).padStart(2,"0");return `${t.getUTCFullYear()}-${p(t.getUTCMonth()+1)}-${p(t.getUTCDate())}-12-00-00`};
+  const rows=[["خالد","واتساب",200,"paid",9],["سالم","ديسكورد",300,"paid",120],["نورة","موقع",11,"late",5],["فهد","توصية",-6,"due",40],["ريم","ديسكورد",75,"paid",3]];
+  licenses=rows.map((r,i)=>({id:"demo"+i,name:r[0],key:"demo000"+i,expiresUTC:n(r[2]),enabled:true}));
+  extra={};rows.forEach((r,i)=>extra["demo"+i]={src:r[1],pay:r[3],amount:r[4],discord:r[0].toLowerCase()+"#"+(1000+i)});
+  save();render();
+};
+document.getElementById("exp").onclick=()=>{
+  const l=[["الاسم","بصمة","ينتهي","الحالة","الدفع","المبلغ","ديسكورد","المصدر"],...all().map(x=>[x.name,fp(x.key),new Date(x.exp).toISOString().slice(0,10),x.lab,PAY[x.pay],x.e.amount||"",x.e.discord||"",x.src])];
+  const b=new Blob(["﻿"+l.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n")],{type:"text/csv"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="black-customers.csv";a.click();
+};
+render();
+</script>
+</body>
+</html>
